@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>果果游戏大厅</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(160deg, #fdf6e3 0%, #f5e3c0 50%, #ecd3a0 100%);
+      color: #3a2f22;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: max(24px, env(safe-area-inset-top)) 16px 48px;
+    }
+    header { text-align: center; margin-bottom: 8px; }
+    h1 { font-size: clamp(28px, 7vw, 44px); letter-spacing: 2px; }
+    h1 .fruit { font-size: 0.8em; }
+    .greet { margin-top: 10px; font-size: 15px; color: #7a6a50; min-height: 22px; }
+    .greet a { color: #4caf7d; font-weight: 600; text-decoration: none; }
+    .games {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 18px;
+      width: 100%;
+      max-width: 780px;
+    }
+    .card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid #d9bd8a;
+      border-radius: 18px;
+      padding: 22px 20px;
+      text-align: center;
+      transition: transform .15s, box-shadow .15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(122, 90, 40, .18); }
+    .card .icon { font-size: 52px; line-height: 1; }
+    .card .name { font-size: 21px; font-weight: 800; margin-top: 10px; }
+    .card .desc { font-size: 13px; color: #7a6a50; margin-top: 6px; line-height: 1.5; }
+    .card .tag {
+      position: absolute; top: 12px; right: -30px;
+      transform: rotate(35deg);
+      background: #e05545; color: #fff;
+      font-size: 11px; padding: 3px 34px;
+      letter-spacing: 1px;
+    }
+    .card.coming { opacity: .62; cursor: default; }
+    .card.coming:hover { transform: none; box-shadow: none; }
+    footer { margin-top: 40px; font-size: 12px; color: #a3947a; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="fruit">🍈♟️🀄</span><br/>果果游戏大厅</h1>
+    <p class="greet" id="greet">一家人的小游戏合集</p>
+  </header>
+
+  <nav class="games">
+    <a class="card" href="/mj/">
+      <span class="tag">人气</span>
+      <div class="icon">🀄</div>
+      <div class="name">果果麻将</div>
+      <div class="desc">家规麻将 · 2-4 人联机<br/>混儿万能 · 语音开黑</div>
+    </a>
+    <a class="card" href="/gmk/">
+      <span class="tag">新上架</span>
+      <div class="icon">♟️</div>
+      <div class="name">果果五子棋</div>
+      <div class="desc">15/19 路 · 好友或 AI 对战<br/>支持多局同时开</div>
+    </a>
+    <a class="card coming" href="javascript:void(0)">
+      <div class="icon">🎁</div>
+      <div class="name">更多游戏</div>
+      <div class="desc">跳棋? 斗地主? UNO?<br/>敬请期待</div>
+    </a>
+  </nav>
+
+  <footer>同一账号、同一批好友, 玩遍所有果果游戏</footer>
+
+  <script>
+    // 登录状态展示: 复用果果五子棋的登录 token (与果果麻将同账号体系)
+    (async () => {
+      const token = localStorage.getItem('gg_wzq_token');
+      const g = document.getElementById('greet');
+      if (!token) { g.innerHTML = '还没有登录, 去 <a href="/gmk/">果果五子棋</a> 登录果果账号吧'; return; }
+      try {
+        const res = await fetch('/gmk/api/me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        if (!res.ok) throw new Error();
+        const j = await res.json();
+        g.innerHTML = `👋 欢迎, <b>${j.name}</b>! 挑一个游戏开始吧`;
+      } catch (e) {
+        g.innerHTML = '登录已过期, 去 <a href="/gmk/">果果五子棋</a> 重新登录吧';
+      }
+    })();
+  </script>
+</body>
+</html>
