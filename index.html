@@ -21,6 +21,17 @@
     h1 .fruit { font-size: 0.8em; }
     .greet { margin-top: 10px; font-size: 15px; color: #7a6a50; min-height: 22px; }
     .greet a { color: #4caf7d; font-weight: 600; text-decoration: none; cursor: pointer; }
+    #hubShowLogin {
+      margin-top: 8px;
+      font-size: 14px;
+      padding: 6px 18px;
+      border: 1px solid #d9bd8a;
+      border-radius: 999px;
+      background: rgba(255,255,255,.8);
+      color: #7a6a50;
+      cursor: pointer;
+    }
+    #hubShowLogin:hover { background: #fff; }
     /* ---- 登录卡 ---- */
     .login-card {
       width: 100%;
@@ -97,6 +108,7 @@
   <header>
     <h1><span class="fruit">🍈♟️🀄</span><br/>果果游戏大厅</h1>
     <p class="greet" id="greet">一家人的小游戏合集</p>
+    <button id="hubShowLogin" type="button" class="link hidden">登录果果账号</button>
   </header>
 
   <!-- 登录 (未登录时显示) -->
@@ -141,11 +153,14 @@
     const greet = $('greet'), loginCard = $('loginCard');
 
     function showLogin() {
-      loginCard.classList.remove('hidden');
+      // 未登录: 只显示小"登录"按钮, 点了才展开登录卡
+      loginCard.classList.add('hidden');
+      $('hubShowLogin').classList.remove('hidden');
       greet.textContent = '一家人的小游戏合集';
     }
     function showGreet(name) {
       loginCard.classList.add('hidden');
+      $('hubShowLogin').classList.add('hidden');
       greet.innerHTML = `👋 欢迎, <b>${name}</b>! 挑一个游戏开始吧 · <a id="hubLogout">退出</a>`;
       $('hubLogout').onclick = () => {
         localStorage.removeItem(TOKEN_KEY);
@@ -189,8 +204,13 @@
       }
     }
 
-    $('hubLogin').addEventListener('click', () => {
-      const user = $('hubUser').value.trim(), pass = $('hubPass').value;
+    $('hubShowLogin').addEventListener('click', () => {
+      $('hubShowLogin').classList.add('hidden');
+      loginCard.classList.remove('hidden');
+      $('hubUser').focus();
+    });
+
+    $('hubLogin').addEventListener('click', () => {      const user = $('hubUser').value.trim(), pass = $('hubPass').value;
       if (!user || !pass) { setMsg('请输入账号和密码'); return; }
       doAuth({ t: 'login', user, pass });
     });
