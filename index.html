@@ -170,7 +170,7 @@
     }
     function setMsg(t, ok) { const m = $('hubMsg'); m.textContent = t || ''; m.className = ok ? 'ok' : ''; }
 
-    // 走五子棋 WS 登录/注册, 成功 resolve(昵称), 失败 reject(原因)
+    // 走五子棋 WS 登录/注册, 成功 resolve(auth_ok 消息, 含 token/name), 失败 reject(原因)
     function wsAuth(msg) {
       return new Promise((resolve, reject) => {
         const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -179,7 +179,7 @@
         try { ws = new WebSocket(`${proto}${location.host}/gmk-ws`); } catch (e) { clearTimeout(timer); return reject('无法连接服务'); }
         ws.onmessage = ev => {
           let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-          if (m.t === 'auth_ok') { clearTimeout(timer); ws.close(); resolve(m.name); }
+          if (m.t === 'auth_ok') { clearTimeout(timer); ws.close(); resolve(m); }
           else if (m.t === 'auth_fail') { clearTimeout(timer); ws.close(); reject('账号或密码错误'); }
           else if (m.t === 'error') { clearTimeout(timer); ws.close(); reject(m.msg || '操作失败'); }
         };
@@ -192,10 +192,10 @@
       $('hubLogin').disabled = $('hubReg').disabled = true;
       setMsg('');
       try {
-        const name = await wsAuth(msg);
-        localStorage.setItem(TOKEN_KEY, msg.token); // 占位, 下面会被覆盖
-        // auth_ok 不带 token? 五子棋注册/登录都会回 token, 保险起见再校验
-        showGreet(name);
+        const m = await wsAuth(msg);
+        if (!m.token) throw new Error('服务未返回登录凭据');
+        localStorage.setItem(TOKEN_KEY, m.token);
+        showGreet(m.name);
         setMsg('✅ 登录成功, 欢迎回来!', true);
       } catch (e) {
         setMsg('⚠ ' + e);
