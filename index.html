@@ -228,6 +228,9 @@
       doAuth({ t: 'register', user, pass, name });
     });
 
+    // 手机浏览器从快照恢复(bfcache)时可能显示过期状态, 强制刷新重建
+    window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+
     // 启动: 已有 token 则校验后直接打招呼, 否则只显示小"登录"按钮
     (async () => {
       const token = localStorage.getItem(TOKEN_KEY);
