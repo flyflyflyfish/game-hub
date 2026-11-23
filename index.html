@@ -20,7 +20,42 @@
     h1 { font-size: clamp(28px, 7vw, 44px); letter-spacing: 2px; }
     h1 .fruit { font-size: 0.8em; }
     .greet { margin-top: 10px; font-size: 15px; color: #7a6a50; min-height: 22px; }
-    .greet a { color: #4caf7d; font-weight: 600; text-decoration: none; }
+    .greet a { color: #4caf7d; font-weight: 600; text-decoration: none; cursor: pointer; }
+    /* ---- 登录卡 ---- */
+    .login-card {
+      width: 100%;
+      max-width: 360px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #d9bd8a;
+      border-radius: 18px;
+      padding: 20px;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .login-card .lc-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .login-card .lc-title small { font-weight: 400; color: #9a8a6d; }
+    .login-card input {
+      width: 100%;
+      font-size: 15px;
+      padding: 10px 12px;
+      border: 1px solid #d9bd8a;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    .lc-btns { display: flex; gap: 10px; justify-content: center; }
+    .lc-btns button {
+      flex: 1;
+      font-size: 15px;
+      padding: 10px 0;
+      border: 1px solid #d9bd8a;
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .lc-btns button.primary { background: #4caf7d; color: #fff; border-color: #4caf7d; }
+    .lc-btns button:disabled { opacity: .6; cursor: wait; }
+    #hubMsg { font-size: 13px; color: #c0392b; min-height: 18px; margin-top: 8px; }
+    #hubMsg.ok { color: #4caf7d; }
     .games {
       margin-top: 24px;
       display: grid;
@@ -64,6 +99,19 @@
     <p class="greet" id="greet">一家人的小游戏合集</p>
   </header>
 
+  <!-- 登录 (未登录时显示) -->
+  <div id="loginCard" class="login-card hidden">
+    <p class="lc-title">登录果果账号 <small>(与果果麻将通用)</small></p>
+    <input id="hubUser" placeholder="账号" maxlength="16" autocomplete="username" />
+    <input id="hubPass" type="password" placeholder="密码" autocomplete="current-password" />
+    <input id="hubName" class="hidden" placeholder="昵称(注册时填)" maxlength="8" />
+    <div class="lc-btns">
+      <button id="hubLogin" type="button" class="primary">登录</button>
+      <button id="hubReg" type="button">注册</button>
+    </div>
+    <p id="hubMsg"></p>
+  </div>
+
   <nav class="games">
     <a class="card" href="/mj/">
       <span class="tag">人气</span>
@@ -87,23 +135,95 @@
   <footer>同一账号、同一批好友, 玩遍所有果果游戏</footer>
 
   <script>
-    // 登录状态展示: 复用果果五子棋的登录 token (与果果麻将同账号体系)
-    (async () => {
-      const token = localStorage.getItem('gg_wzq_token');
-      const g = document.getElementById('greet');
-      if (!token) { g.innerHTML = '还没有登录, 去 <a href="/gmk/">果果五子棋</a> 登录果果账号吧'; return; }
+    // 大厅登录: 直连果果五子棋 WS (/gmk-ws, 同账号体系), 登录态存同一 token
+    const TOKEN_KEY = 'gg_wzq_token';
+    const $ = id => document.getElementById(id);
+    const greet = $('greet'), loginCard = $('loginCard');
+
+    function showLogin() {
+      loginCard.classList.remove('hidden');
+      greet.textContent = '一家人的小游戏合集';
+    }
+    function showGreet(name) {
+      loginCard.classList.add('hidden');
+      greet.innerHTML = `👋 欢迎, <b>${name}</b>! 挑一个游戏开始吧 · <a id="hubLogout">退出</a>`;
+      $('hubLogout').onclick = () => {
+        localStorage.removeItem(TOKEN_KEY);
+        showLogin();
+        setMsg('已退出登录', true);
+      };
+    }
+    function setMsg(t, ok) { const m = $('hubMsg'); m.textContent = t || ''; m.className = ok ? 'ok' : ''; }
+
+    // 走五子棋 WS 登录/注册, 成功 resolve(昵称), 失败 reject(原因)
+    function wsAuth(msg) {
+      return new Promise((resolve, reject) => {
+        const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+        let ws;
+        const timer = setTimeout(() => { try { ws && ws.close(); } catch (e) {} reject('服务无响应, 请稍后再试'); }, 10000);
+        try { ws = new WebSocket(`${proto}${location.host}/gmk-ws`); } catch (e) { clearTimeout(timer); return reject('无法连接服务'); }
+        ws.onmessage = ev => {
+          let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+          if (m.t === 'auth_ok') { clearTimeout(timer); ws.close(); resolve(m.name); }
+          else if (m.t === 'auth_fail') { clearTimeout(timer); ws.close(); reject('账号或密码错误'); }
+          else if (m.t === 'error') { clearTimeout(timer); ws.close(); reject(m.msg || '操作失败'); }
+        };
+        ws.onerror = () => { clearTimeout(timer); reject('连接服务失败'); };
+        ws.onopen = () => ws.send(JSON.stringify(msg));
+      });
+    }
+
+    async function doAuth(msg) {
+      $('hubLogin').disabled = $('hubReg').disabled = true;
+      setMsg('');
       try {
-        const res = await fetch('/gmk/api/me', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-        if (!res.ok) throw new Error();
-        const j = await res.json();
-        g.innerHTML = `👋 欢迎, <b>${j.name}</b>! 挑一个游戏开始吧`;
+        const name = await wsAuth(msg);
+        localStorage.setItem(TOKEN_KEY, msg.token); // 占位, 下面会被覆盖
+        // auth_ok 不带 token? 五子棋注册/登录都会回 token, 保险起见再校验
+        showGreet(name);
+        setMsg('✅ 登录成功, 欢迎回来!', true);
       } catch (e) {
-        g.innerHTML = '登录已过期, 去 <a href="/gmk/">果果五子棋</a> 重新登录吧';
+        setMsg('⚠ ' + e);
+      } finally {
+        $('hubLogin').disabled = $('hubReg').disabled = false;
       }
+    }
+
+    $('hubLogin').addEventListener('click', () => {
+      const user = $('hubUser').value.trim(), pass = $('hubPass').value;
+      if (!user || !pass) { setMsg('请输入账号和密码'); return; }
+      doAuth({ t: 'login', user, pass });
+    });
+    $('hubReg').addEventListener('click', () => {
+      const nameInput = $('hubName');
+      if (nameInput.classList.contains('hidden')) { // 第一次点: 展开昵称栏
+        nameInput.classList.remove('hidden');
+        nameInput.focus();
+        return;
+      }
+      const user = $('hubUser').value.trim(), pass = $('hubPass').value, name = nameInput.value.trim();
+      if (!user || !pass) { setMsg('请输入账号和密码'); return; }
+      if (!name) { setMsg('请填写昵称'); return; }
+      doAuth({ t: 'register', user, pass, name });
+    });
+
+    // 启动: 已有 token 则校验后直接打招呼, 否则显示登录卡
+    (async () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token) {
+        try {
+          const res = await fetch('api/me', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+          });
+          if (!res.ok) throw new Error();
+          const j = await res.json();
+          showGreet(j.name);
+          return;
+        } catch (e) { localStorage.removeItem(TOKEN_KEY); }
+      }
+      showLogin();
     })();
   </script>
 </body>
